@@ -380,15 +380,21 @@ validates strictly instead of guessing.
 
 1. **Build the expected sequence.** Step one UTC hour at a time from local
    midnight on `startDate` to local midnight after `endDate`. Each step's label
-   is `local.strftime("%I %p")`. This naturally gives 25 labels on fall-back
-   day (two `01 AM`, EDT then EST) and 23 on spring-forward day.
+   is `local.strftime("%I %p")`. On spring-forward day this gives 23 labels.
+   On fall-back day it gives 25, with two `01 AM` (EDT, then EST).
+   - **Duke's shape** (confirmed live, SPEC §10) leaves out the repeated
+     fall-back hour, so its fall-back day has 24 labels.
 2. **Fast path:** if Duke's labels equal the expected labels exactly, zip them
-   and use each UTC start directly. The fall-back duplicate maps to
-   01:00 EST. That fixes the old parser's lost hour.
+   and use each UTC start directly.
+   - **Shapes tried:** Duke's current shape first, then the older 25-row
+     shape.
+   - **Fall-back day:** the single `01 AM` is 01:00 EDT. 01:00 EST is a
+     missing hour, with no row written and the sum carried over it.
 3. **Mismatch on a multi-day window:** re-request that window **one day at a
-   time**. Within a single day, labels are unique apart from the DST pair. So
-   matching Duke's rows as an ordered subsequence of the expected labels is
-   unambiguous: skipped labels are missing hours. Any row that can't be placed
+   time**. Within a single day, labels are unique apart from the fall-back
+   `01 AM` pair. Matching Duke's rows as an ordered subsequence of the expected
+   labels is then unambiguous: skipped labels are missing hours, and a single
+   `01 AM` goes on the first (EDT) hour. Any row that can't be placed
    rejects that day. The day is logged and treated as missing.
 
    This closes the "whole missing day silently shifts everything" hole (SPEC

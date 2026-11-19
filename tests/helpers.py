@@ -49,3 +49,16 @@ def day_rows(values: list[float] | None = None) -> list[dict[str, Any]]:
         {"date": hour_label(hour), "usage": str(value), "temperatureAvg": 50}
         for hour, value in enumerate(values)
     ]
+
+
+def rows_for_hours(hours: list[int], value: float = 0.5) -> list[dict[str, Any]]:
+    """Rows labeled with the given local hours (0-23), e.g. a DST day."""
+    return [
+        {"date": hour_label(hour), "usage": str(value), "temperatureAvg": 50}
+        for hour in hours
+    ]
+
+
+# Row shapes Duke returned on 2026-03-08 and 2026-11-01 (docs/SPEC.md §10).
+SPRING_FORWARD_HOURS = [h for h in range(24) if h != 2]  # 23 rows, no 02 AM
+FALL_BACK_HOURS = list(range(24))  # 24 rows, a single 01 AM

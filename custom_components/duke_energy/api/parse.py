@@ -8,6 +8,13 @@ instead of guessing (docs/DESIGN.md §4.3):
   sequence exactly.
 * A single day may have missing hours, as long as the remaining rows can be
   placed unambiguously.
+
+DST, as observed live on 2026-03-08 and 2026-11-01 (docs/SPEC.md §10):
+
+* Spring-forward days have 23 rows, with no "02 AM".
+* Fall-back days have 24 rows, with a single "01 AM". Duke leaves out the
+  repeated hour; its pre-2025 response sent two "01 AM" rows instead. The
+  single "01 AM" is the first 1 AM (EDT), and the repeated hour is missing.
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ class ExpectedHour:
     start: datetime  # UTC
     key: LabelKey  # (hour on a 12-hour clock, is_pm)
     local_date: date
+    repeated: bool = False  # second occurrence of a fall-back wall-clock hour
 
 
 def label_key(label: Any) -> LabelKey | None:
@@ -54,11 +62,14 @@ def _key_for(local: datetime) -> LabelKey:
     return (local.hour % 12 or 12, local.hour >= 12)
 
 
-def expected_hours(start: date, end: date, tz: ZoneInfo) -> list[ExpectedHour]:
+def expected_hours(
+    start: date, end: date, tz: ZoneInfo, *, include_repeated: bool = True
+) -> list[ExpectedHour]:
     """List every real hour from local midnight on `start` through `end`.
 
     Steps in UTC, so a fall-back day has 25 hours (two "01 AM") and a
-    spring-forward day has 23 (no "02 AM").
+    spring-forward day has 23 (no "02 AM"). With `include_repeated=False`, the
+    repeated fall-back hour is left out, matching what Duke sends today.
     """
     current = datetime(start.year, start.month, start.day, tzinfo=tz).astimezone(UTC)
     after = end + timedelta(days=1)
@@ -66,7 +77,9 @@ def expected_hours(start: date, end: date, tz: ZoneInfo) -> list[ExpectedHour]:
     hours: list[ExpectedHour] = []
     while current < stop:
         local = current.astimezone(tz)
-        hours.append(ExpectedHour(current, _key_for(local), local.date()))
+        repeated = local.fold == 1
+        if include_repeated or not repeated:
+            hours.append(ExpectedHour(current, _key_for(local), local.date(), repeated))
         current += timedelta(hours=1)
     return hours
 
@@ -100,14 +113,13 @@ def align_day(
     if len(keys) != len(parsed):
         return None
 
-    # On a fall-back day "01 AM" occurs twice. If Duke sent only one of them
-    # we can't tell which hour it is.
+    # On a fall-back day "01 AM" can occur twice. Duke now sends it once; the
+    # in-order placement below then puts it on the first (EDT) hour and
+    # leaves the repeated hour missing.
     wanted = Counter(hour.key for hour in expected)
     got = Counter(keys)
     for key, count in got.items():
         if count > wanted.get(key, 0):
-            return None
-        if wanted[key] > 1 and count != wanted[key]:
             return None
 
     pairs: list[tuple[datetime, Any]] = []

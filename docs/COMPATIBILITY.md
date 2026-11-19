@@ -236,8 +236,10 @@ All of these run against a real recorder, via
    the same final sums as a run with no failure.
 4. **Coverage requirement.** Fetched data ends before `T_last`. Assert stored
    rows are untouched.
-5. **DST.** Fall-back (25 rows) and spring-forward (23 rows) fixtures. Assert
-   correct UTC starts and that no hour is dropped or duplicated.
+5. **DST.** Fall-back fixtures, both Duke's current 24-row shape (single
+   `01 AM`) and the older 25-row shape, plus spring-forward (23 rows). Assert
+   correct UTC starts, that no hour is duplicated, and that the sum stays
+   continuous across the missing repeated hour.
 6. **Migration.** A v2 entry with an old-format token migrates without touching
    statistics. Unload and remove do not clear statistics.
 7. **ID stability.** The ID built from fixture `serialNum` values equals the

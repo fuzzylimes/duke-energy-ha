@@ -1,5 +1,5 @@
 import time
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -27,7 +27,15 @@ from custom_components.duke_energy.api.const import (
     USAGE_GRAPH_URL,
 )
 
-from ..helpers import EMAIL, INTERNAL_ID, SERIAL, day_rows, make_id_token
+from ..helpers import (
+    EMAIL,
+    FALL_BACK_HOURS,
+    INTERNAL_ID,
+    SERIAL,
+    day_rows,
+    make_id_token,
+    rows_for_hours,
+)
 from .conftest import json_body, sequence
 
 UA = "Duke%20Energy/9999 CFNetwork/1.0 Darwin/1.0"
@@ -273,3 +281,25 @@ async def test_missing_identity_is_recovered_by_refresh(
         c[1] for c in mock_http.mock_calls if c[1].with_query(None) == ACCOUNT_LIST_URL
     )
     assert url.query["internalUserID"] == INTERNAL_ID
+
+
+async def test_window_containing_fall_back_needs_one_request(
+    transport, mock_http, api_token
+):
+    # 2026-10-19..2026-11-18, the live case: 30 normal days plus Duke's 24-row
+    # fall-back day. It must line up without day-by-day re-fetching.
+    start, end = date(2026, 10, 19), date(2026, 11, 18)
+    rows = []
+    day = start
+    while day <= end:
+        rows += (
+            rows_for_hours(FALL_BACK_HOURS) if day == date(2026, 11, 1) else day_rows()
+        )
+        day += timedelta(days=1)
+    mock_http.post(str(USAGE_GRAPH_URL), json={"usageArray": rows})
+    result = await make_client(transport).async_get_hourly(METER, start, end)
+    usage_calls = [c for c in mock_http.mock_calls if c[1] == USAGE_GRAPH_URL]
+    assert len(usage_calls) == 1
+    assert len(result.readings) == 31 * 24
+    assert result.missing_hours == 1  # the repeated 01:00 EST hour
+    assert result.rejected_days == []

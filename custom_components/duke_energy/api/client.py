@@ -293,10 +293,15 @@ class DukeEnergyClient:
         result = HourlyResult()
         rows = await self.async_get_usage_rows(meter, start, end)
         expected = expected_hours(start, end, self._tz)
-        pairs = align_exact(rows, expected)
-        if pairs is not None:
-            result.readings, result.invalid_values = to_readings(pairs)
-            return result
+        # Duke's current shape leaves out the repeated fall-back hour. Also
+        # accept the older shape that included it.
+        duke_shape = expected_hours(start, end, self._tz, include_repeated=False)
+        for candidate in (duke_shape, expected):
+            pairs = align_exact(rows, candidate)
+            if pairs is not None:
+                result.readings, result.invalid_values = to_readings(pairs)
+                result.missing_hours = len(expected) - len(pairs)
+                return result
 
         if start == end:
             day_rows: dict[date, list[dict[str, Any]]] = {start: rows}

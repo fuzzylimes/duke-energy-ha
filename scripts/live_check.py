@@ -8,6 +8,8 @@ Usage:
     uv run python scripts/live_check.py --finish 'https://login.duke-energy.com/ios/...'
                                                      # step 2: finish sign-in, then check
     uv run python scripts/live_check.py              # later runs reuse saved tokens
+    uv run python scripts/live_check.py --day 2026-11-01
+                                                     # raw hourly rows for one day
     uv run python scripts/live_check.py --days 3     # fetch the last 3 days
     uv run python scripts/live_check.py --login      # force a new sign-in
     uv run python scripts/live_check.py --capture tests/fixtures/live
@@ -27,7 +29,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -233,6 +235,16 @@ async def run(args: argparse.Namespace) -> int:
                 )
                 if meter.service_type != "ELECTRIC":
                     continue
+                if args.day:
+                    day = date.fromisoformat(args.day)
+                    rows = await client.async_get_usage_rows(meter, day, day)
+                    print(f"      raw rows for {day} ({len(rows)}):")
+                    for index, row in enumerate(rows):
+                        print(
+                            f"        {index:2d}  {row.get('date')!s:>8}  "
+                            f"usage={row.get('usage')!s}"
+                        )
+                    continue
                 result = await client.async_get_hourly(meter, start, end)
                 readings = result.readings
                 total = sum(reading.kwh for reading in readings)
@@ -259,6 +271,9 @@ def main() -> int:
         "--finish", metavar="URL", help="finish sign-in with the pasted URL"
     )
     parser.add_argument("--capture", metavar="DIR", help="save redacted responses")
+    parser.add_argument(
+        "--day", metavar="YYYY-MM-DD", help="print Duke's raw hourly rows for one day"
+    )
     parser.add_argument("--user-agent", help="override the app User-Agent")
     args = parser.parse_args()
     if args.start:

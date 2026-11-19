@@ -122,22 +122,27 @@ async def test_continues_existing_series_without_restart(recorder_mock, hass, no
     assert meta["name"] == f"Duke Energy Electric {SERIAL} Consumption"
 
 
-async def test_fall_back_hour_is_kept(recorder_mock, hass, freezer):
+async def test_fall_back_day_stays_continuous(recorder_mock, hass, freezer):
     freezer.move_to(datetime(2025, 11, 4, 12, tzinfo=TZ))
     start = datetime(2025, 10, 31, 0, tzinfo=TZ).astimezone(UTC)
-    seeded = seed(hass, start, 24, base=0.0)
+    seed(hass, start, 24, base=0.0)
     await async_wait_recording_done(hass)
     coordinator = coordinator_for(hass, FakeClient())
     await coordinator._async_update_data()
     await async_wait_recording_done(hass)
-    rows = await stored_rows(hass, datetime(2025, 11, 2, 0, tzinfo=TZ).astimezone(UTC))
+    rows = sorted(await stored_rows(hass, start), key=lambda r: r["start"])
     nov2 = [
         r
         for r in rows
         if datetime.fromtimestamp(r["start"], UTC).astimezone(TZ).date().day == 2
     ]
-    assert len(nov2) == 25
-    assert seeded
+    # Duke sends 24 rows: 01:00 EDT is present, 01:00 EST is a missing hour.
+    assert len(nov2) == 24
+    starts = {r["start"] for r in nov2}
+    assert datetime(2025, 11, 2, 5, tzinfo=UTC).timestamp() in starts
+    assert datetime(2025, 11, 2, 6, tzinfo=UTC).timestamp() not in starts
+    # The running total just carries over the missing hour.
+    assert rows[-1]["sum"] == pytest.approx(len(rows))
 
 
 async def test_partial_failure_imports_prefix_then_completes(recorder_mock, hass, now):

@@ -12,7 +12,13 @@ from custom_components.duke_energy.api.parse import (
     to_readings,
 )
 
-from ..helpers import day_rows, hour_label
+from ..helpers import (
+    FALL_BACK_HOURS,
+    SPRING_FORWARD_HOURS,
+    day_rows,
+    hour_label,
+    rows_for_hours,
+)
 
 TZ = ZoneInfo("America/New_York")
 
@@ -96,10 +102,43 @@ def test_align_day_fall_back_full():
     assert len(pairs) == 25
 
 
-def test_align_day_fall_back_ambiguous_single_1am_rejected():
-    expected = expected_hours(date(2025, 11, 2), date(2025, 11, 2), TZ)
-    rows = [{"date": hour_label(h), "usage": "1"} for h in range(24)]
-    assert align_day(rows, expected) is None
+def test_align_day_fall_back_single_1am_is_the_edt_hour():
+    # What Duke sends today: 24 rows, one "01 AM".
+    expected = expected_hours(date(2026, 11, 1), date(2026, 11, 1), TZ)
+    placed = align_day(rows_for_hours(FALL_BACK_HOURS), expected)
+    assert placed is not None
+    pairs, missing = placed
+    assert missing == 1
+    starts = [start for start, _ in pairs]
+    assert datetime(2026, 11, 1, 5, tzinfo=UTC) in starts  # 01:00 EDT
+    assert datetime(2026, 11, 1, 6, tzinfo=UTC) not in starts  # 01:00 EST
+    assert len(set(starts)) == 24
+
+
+def test_expected_hours_duke_shape_drops_repeated_hour():
+    hours = expected_hours(
+        date(2026, 11, 1), date(2026, 11, 1), TZ, include_repeated=False
+    )
+    assert len(hours) == 24
+    assert [h.key for h in hours] == [
+        label_key(r["date"]) for r in rows_for_hours(FALL_BACK_HOURS)
+    ]
+    full = expected_hours(date(2026, 11, 1), date(2026, 11, 1), TZ)
+    assert [h.repeated for h in full].count(True) == 1
+
+
+def test_align_exact_window_with_duke_dst_days():
+    start, end = date(2026, 10, 30), date(2026, 11, 2)
+    rows = day_rows() + day_rows() + rows_for_hours(FALL_BACK_HOURS) + day_rows()
+    duke_shape = expected_hours(start, end, TZ, include_repeated=False)
+    assert align_exact(rows, duke_shape) is not None
+    assert align_exact(rows, expected_hours(start, end, TZ)) is None
+
+    start, end = date(2026, 3, 7), date(2026, 3, 9)
+    rows = day_rows() + rows_for_hours(SPRING_FORWARD_HOURS) + day_rows()
+    pairs = align_exact(rows, expected_hours(start, end, TZ, include_repeated=False))
+    assert pairs is not None
+    assert len(pairs) == 71
 
 
 def test_align_day_rejects_extra_or_unknown_rows():

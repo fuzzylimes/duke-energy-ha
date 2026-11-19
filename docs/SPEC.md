@@ -387,13 +387,21 @@ Response:
 1. **Missing hours.** Some hours are simply absent: the label sequence skips
    one (hunterjm `5bd3836`, 2024-09). Upstream detects this by comparing
    labels to the expected label and shifting an offset.
-2. **Duplicate hour at DST fall-back.** On 2024-11-03, Duke returned 25 rows
-   with `"01 AM"` twice (DallasEpperson, aiodukeenergy #6/#7). Upstream since
-   `ebfeaab` (2025-03) **skips** the second `01 AM`. That **drops one real hour
-   of energy every November**. A later parser must map it to 01:00 EST
-   (`fold=1`) instead.
-3. **Spring-forward.** ⚠ Never observed. Presumably 23 rows with no `"02 AM"`.
-   If so, upstream's label check marks it missing, which is harmless.
+2. **DST fall-back.** ⚠ **Changed over time:**
+   - **2024-11-03, the older `TickSeries` response:** 25 rows, with `"01 AM"`
+     twice (DallasEpperson, aiodukeenergy #6/#7). Upstream since `ebfeaab`
+     (2025-03) skips the second `01 AM`, which dropped one real hour of
+     energy every November.
+   - **2026-11-01, today's `usageArray` response (live, §10):** **24 rows
+     with a single `"01 AM"`.** Duke leaves out the repeated hour. Its value
+     (0.27 kWh, next to 0.26 on each side) is one hour's usage, not two
+     summed.
+
+   We place the single `01 AM` on the first 1 AM (EDT) and treat 01:00 EST
+   as missing, consistent with what the old integration stored. The older
+   25-row shape is still accepted.
+3. **DST spring-forward** (2026-03-08, live, §10): 23 rows with no
+   `"02 AM"`, as presumed.
 4. **Short arrays.** The response can have fewer rows than the window implies,
    for example when the window reaches past the data horizon. Upstream crashes
    with `IndexError`. Fixed by crash0verride11 (`d642826`, PR #20) and jameslb
@@ -511,7 +519,8 @@ re-auth flow, which can't fix them. That cost users repeated pointless logins
    history really goes.
 4. Does `"0"` usage mean no data or real zero? Are negative values possible
    (net metering)?
-5. The row count on a spring-forward day.
+5. ~~The row count on DST days.~~ Answered live on 2026-11-19 (§10):
+   spring-forward has 23 rows, fall-back has 24.
 6. Whether a whole day can be missing from an hourly series.
 7. Whether the DAILY `date` construction changed (PR #20 vs jameslb). This only
    matters if gas is ever in scope.
@@ -520,7 +529,8 @@ re-auth flow, which can't fix them. That cost users repeated pointless logins
 9. Whether the desktop-browser check needs the UA only, or the UA plus client
    hints.
 10. Whether any Duke service area is outside `America/New_York`.
-11. The largest usable window per usage request.
+11. The largest usable window per usage request. 31 days works (§10); larger
+    windows are untested.
 
 ## 10. Live verification log
 
@@ -531,5 +541,7 @@ runs here, with date and result, and never with identifying details.
 |---|---|---|
 | 2026-11-19 | Paste-callback sign-in in a desktop browser with iPhone emulation; Auth0 code exchange (JSON body, app UA `Duke%20Energy/1374 …`); `login/auth-token` with the iOS API client; `account/list`; `account-details-v2`; one `HOURLY`/`DAY` usage request covering 3 days (EST, no DST change) | All succeeded. 1 account, 1 electric meter. The usage response had exactly 72 rows whose labels matched the expected sequence one-for-one: no missing hours, no invalid values. The meter's `serialNum` produced the maintainer's existing statistic ID unchanged. |
 
-Still unverified live: §9 questions 1–6 and 8–11, a 31-day window (Q11), and
-a DST-transition day (Q5).
+| 2026-11-19 | One 31-day `HOURLY`/`DAY` request, 2026-10-19..2026-11-18, which spans the fall-back day | Accepted. That version of the parser expected 25 rows for 2026-11-01, so the window didn't line up; the day-by-day re-fetch placed 30 days (720 hours) and rejected 2026-11-01. Fixed by the next row. |
+| 2026-11-19 | Raw rows for 2026-11-01 (fall-back) and 2026-03-08 (spring-forward), via `live_check.py --day` | Fall-back: **24 rows**, one `"01 AM"`. Spring-forward: **23 rows**, no `"02 AM"`. The parser now expects these shapes, so a 31-day window spanning either day lines up in a single request. |
+
+Still unverified live: §9 questions 1–4, 6 and 8–10.

@@ -74,7 +74,8 @@ class FakeClient:
 
             raise RequestRejectedError("account/usage/graph", 400, "before history")
         result = HourlyResult()
-        for hour in expected_hours(start, end, TZ):
+        # Duke's shape: the repeated fall-back hour is never sent.
+        for hour in expected_hours(start, end, TZ, include_repeated=False):
             if (
                 self.available_from is not None
                 and hour.local_date < self.available_from
