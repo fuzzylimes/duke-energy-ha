@@ -229,7 +229,7 @@ The config entry, version 3, stores:
 ```python
 entry.data = {
     "refresh_token": str,
-    "id_token": str,          # cache only, so a restart within 30 min skips a refresh
+    "id_token": str,  # cache only, so a restart within 30 min skips a refresh
     "id_token_exp": float,
     "internal_identifier": str,
     "email": str,
@@ -490,20 +490,23 @@ custom_components/duke_energy/
     client.py          account/list (+normalization), account-details-v2, usage graph
     parse.py           hourly row alignment (pure)
     errors.py          error classes + response classifier
+    http.py            Transport: timeouts, retries, classification in one place
     models.py          dataclasses: TokenSet, Account, Meter, HourlyReading
 tests/
-  fixtures/            sanitized live captures + synthetic edge cases (DST, gaps, HTML 403, …)
+  fixtures/            sanitized live captures (from live_check.py --capture)
+  helpers.py, fakes.py synthetic IDs, JWT builder, fake Duke client for HA-level tests
   api/                 test_oauth.py, test_tokens.py, test_client.py, test_parse.py, test_errors.py
   test_statistics_plan.py
   test_statistics_recorder.py
   test_config_flow.py
   test_coordinator.py
-  test_migration.py
+  test_init.py         setup, unload/removal keep statistics, v1/v2 → v3 migration
+  test_user_agent.py
 scripts/
-  live_check.py        maintainer-only: paste login in a terminal, fetch yesterday, print redacted summary
-  capture_fixture.py   maintainer-only: save a redacted response as a test fixture
+  live_check.py        maintainer-only: paste login in a terminal, fetch recent days, print a
+                       redacted summary; --capture DIR saves redacted responses as fixtures
 hacs.json
-pyproject.toml         uv-managed; dev deps only (HA test plugin, ruff, mypy, aioresponses)
+pyproject.toml         uv-managed; dev deps only (HA test plugin, ruff, mypy)
 uv.lock
 .github/workflows/ci.yml   ruff, mypy, pytest (min + latest HA), hassfest, HACS validation
 README.md
@@ -531,7 +534,8 @@ request sets the full header set from SPEC §4.1.
 - `uv` for the environment.
 - `pytest` with `pytest-homeassistant-custom-component`, pinned per CI matrix
   entry.
-- `aioresponses` for HTTP in `tests/api`.
+- HA's `AiohttpClientMocker` (from the test plugin) for HTTP in `tests/api`.
+  `aioresponses` doesn't work with the aiohttp version HA ships.
 - `ruff` for format and lint.
 - `mypy`: strict for `api/` and `statistics.py`, default for the HA glue.
 
@@ -571,8 +575,8 @@ request sets the full header set from SPEC §4.1.
    - keep-alive refresh.
 7. **Live check (manual, not CI).** `scripts/live_check.py` runs against your
    account when Duke changes something. Tokens go to `.secrets/` (gitignored).
-   New response shapes become fixtures via `capture_fixture.py`, which redacts
-   them first.
+   New response shapes become fixtures via `live_check.py --capture DIR`, which
+   redacts them first.
 
 **CI:**
 

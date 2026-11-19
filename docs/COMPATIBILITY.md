@@ -123,9 +123,12 @@ row**.
 3. **Load stored rows** for the window plus one hour before it
    (`statistics_during_period(..., types={"sum", "state"})`).
 4. **Pick the anchor row:** the latest stored row with
-   `start < first fetched hour`. Its `sum` is the base. If no stored row is
-   that old (the overlap reaches back before the series start), the base is
-   `0.0`. That only happens for a brand-new series.
+   `start < first fetched hour`. Its `sum` is the base.
+   - **No stored row is that old** (the overlap reaches back before the series
+     start): don't write any hour before the series' first stored row. Use
+     that row's `sum − state` as the base, so every stored sum stays exactly
+     as it is.
+   - **No stored rows at all** (a brand-new series): the base is `0.0`.
 5. **Walk forward** through fetched hours in ascending order: `sum += kWh`,
    and emit `(start, state=kWh, sum)` for each hour.
    - **Suffix rule:** a rewrite always covers a contiguous range from just

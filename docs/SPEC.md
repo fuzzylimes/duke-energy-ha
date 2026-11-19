@@ -1,6 +1,7 @@
 # SPEC: What we know about Duke Energy's API and login
 
-Status: approved research, 2026-11-19. Nothing in this repo has been run
+Status: approved research, 2026-11-19. A first live check passed the same day
+(§10). Before that, nothing in this repo had been run
 against Duke's live API yet. Every claim below comes from the reference code,
 its git history, forks, PRs and issues. Each claim names its source.
 
@@ -520,3 +521,15 @@ re-auth flow, which can't fix them. That cost users repeated pointless logins
    hints.
 10. Whether any Duke service area is outside `America/New_York`.
 11. The largest usable window per usage request.
+
+## 10. Live verification log
+
+Checks run with `scripts/live_check.py` against a real account. Record new
+runs here, with date and result, and never with identifying details.
+
+| Date | What was checked | Result |
+|---|---|---|
+| 2026-11-19 | Paste-callback sign-in in a desktop browser with iPhone emulation; Auth0 code exchange (JSON body, app UA `Duke%20Energy/1374 …`); `login/auth-token` with the iOS API client; `account/list`; `account-details-v2`; one `HOURLY`/`DAY` usage request covering 3 days (EST, no DST change) | All succeeded. 1 account, 1 electric meter. The usage response had exactly 72 rows whose labels matched the expected sequence one-for-one: no missing hours, no invalid values. The meter's `serialNum` produced the maintainer's existing statistic ID unchanged. |
+
+Still unverified live: §9 questions 1–6 and 8–11, a 31-day window (Q11), and
+a DST-transition day (Q5).
