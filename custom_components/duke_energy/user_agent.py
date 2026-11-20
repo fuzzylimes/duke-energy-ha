@@ -61,8 +61,10 @@ async def async_fetch_remote(hass: HomeAssistant) -> str | None:
     """Fetch the shared value. Returns None on any problem."""
     session = async_get_clientsession(hass)
     try:
-        async with asyncio.timeout(FETCH_TIMEOUT):
-            response = await session.get(REMOTE_USER_AGENTS_URL)
+        async with (
+            asyncio.timeout(FETCH_TIMEOUT),
+            session.get(REMOTE_USER_AGENTS_URL) as response,
+        ):
             if response.status != 200:
                 _LOGGER.debug("User-Agent list returned HTTP %s", response.status)
                 return None

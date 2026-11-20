@@ -72,8 +72,10 @@ entry under the old code, which wipes its statistics.
 - **Re-auth only for failures re-auth can fix.** WAF/edge blocks, revoked
   client credentials and API route changes become repair issues and retries,
   not reauth (DESIGN §5).
-- **Never log** tokens, the `Authorization` header, email, account numbers,
-  addresses or serials.
+- **Never log** tokens, the `Authorization` header, email, account numbers or
+  addresses. Meter serials and statistic IDs may be logged: HA already shows
+  them, and masking them makes logs harder to follow. The rule for serials is
+  the one above: never commit a real one.
 - **App User-Agent resolution, in priority order:**
   1. the user override in options;
   2. a remote `user-agents.json` in this repo, fetched weekly or right after a
