@@ -543,5 +543,6 @@ runs here, with date and result, and never with identifying details.
 
 | 2026-11-19 | One 31-day `HOURLY`/`DAY` request, 2026-10-19..2026-11-18, which spans the fall-back day | Accepted. That version of the parser expected 25 rows for 2026-11-01, so the window didn't line up; the day-by-day re-fetch placed 30 days (720 hours) and rejected 2026-11-01. Fixed by the next row. |
 | 2026-11-19 | Raw rows for 2026-11-01 (fall-back) and 2026-03-08 (spring-forward), via `live_check.py --day` | Fall-back: **24 rows**, one `"01 AM"`. Spring-forward: **23 rows**, no `"02 AM"`. The parser now expects these shapes, so a 31-day window spanning either day lines up in a single request. |
+| 2026-11-20 | First run inside a real HA install (not `live_check.py`): migration from hunterjm 0.3.1 by file swap, then the first poll | Entry migrated v2 → v3 with the old Auth0 refresh token still valid, so no re-auth. Backfilled 2026-11-09..18 with no jump in the sum at the boundary. 2026-11-19 wasn't yet available on the morning of the 20th. The existing history (re-imported earlier by the old code after an entry delete) starts about 3 years back. That's consistent with §4.4's ~3-year depth, but the exact first row wasn't checked. |
 
 Still unverified live: §9 questions 1–4, 6 and 8–10.

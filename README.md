@@ -28,19 +28,61 @@ It writes hourly history that the Energy dashboard reads directly.
 ### Coming from hunterjm/ha-dukeenergy
 
 The old integration **deletes its statistics whenever its entry is reloaded,
-disabled or deleted.** To keep your history, switch over without doing any of
-those:
+disabled or deleted.** To keep your history, replace its files by hand while
+leaving its entry alone. This integration then takes the entry over.
+
+> **Don't uninstall the old integration in Marketplace (HACS).** Marketplace
+> won't uninstall an integration that's still set up. Instead it offers to
+> delete the Duke Energy entry for you, or asks you to delete it first. While
+> the old code is running, either choice erases your history.
+
+You need access to your Home Assistant config folder (usually `/config`), for
+example through the Samba share, SSH or Studio Code Server app.
 
 1. **Back up Home Assistant** (at least `home-assistant_v2.db`).
 2. **Don't** delete, reload or disable the existing Duke Energy entry.
-3. In HACS, remove the old repository and add this one. Both use the domain
-   `duke_energy`, so this one replaces the old files.
-4. Restart Home Assistant.
+3. **Download this integration:** on this repository's GitHub page, choose
+   **Code → Download ZIP**, then unzip it.
+4. **Replace the files.** Delete the folder `custom_components/duke_energy`
+   inside your config folder. Then copy in the `custom_components/duke_energy`
+   folder from the download, including its `api` subfolder. Home Assistant
+   keeps running the old code until it restarts, so nothing gets unloaded.
+5. **Restart Home Assistant.**
 
-The existing entry is migrated in place. If its saved sign-in still works, you
-won't need to sign in at all. Otherwise you'll be asked to sign in again (see
-below). Usage then continues from the last hour you have, filling in anything
-missed since, as far back as Duke provides.
+The existing entry is migrated in place. Check
+**Settings → Devices & services → Duke Energy**:
+
+- **Loaded, with no prompt:** your saved sign-in still worked.
+- **Asks you to sign in again:** follow [Sign in](#sign-in) below.
+
+Usage then continues from the last hour you have. Shortly after the restart,
+the hours missed since the old integration stopped are filled in, as far back
+as Duke provides.
+
+The migration and import messages are logged at info level, which Home
+Assistant hides by default. To see them, add this to `configuration.yaml` and
+restart:
+
+```yaml
+logger:
+  logs:
+    custom_components.duke_energy: info
+```
+
+Then look for `Migrated Duke Energy entry from v2 to v3`.
+
+#### Afterwards: switch Marketplace over
+
+Marketplace still lists the old integration as installed. **Don't update or
+redownload it there**, because that puts the old code back.
+
+To get updates for this integration through Marketplace, you can switch over
+once the steps above have worked. This integration never deletes statistics,
+so removing its entry no longer touches your history:
+
+1. In Marketplace, uninstall **Duke Energy** and let it delete the entry.
+2. Add this repository and download it (see [Install](#install)), then restart.
+3. Add the integration again and sign in. Your history continues.
 
 ## Sign in
 

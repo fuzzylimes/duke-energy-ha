@@ -26,9 +26,21 @@ them. Update the docs in the same change as the code.
 The design docs are approved, and v0.1.0 is implemented on branch
 `feat/initial-implementation`. It is tested against mocks and a real recorder,
 and the API client passed a first live check on 2026-11-19 (docs/SPEC.md §10).
-**Not yet run inside a real HA install.** That's the next milestone, followed by
-watching the migration backfill. `scripts/live_check.py` runs on the
-maintainer's Mac with only aiohttp and PyJWT:
+On 2026-11-20 it ran in the maintainer's HA install for the first time. It
+migrated the hunterjm 0.3.1 entry in place, kept the sign-in, and backfilled
+from Nov 9 with a continuous sum (COMPATIBILITY §4).
+
+**Next:**
+
+- confirm daily imports keep arriving (the 19th was still pending on the
+  morning of the 20th);
+- verify the Marketplace switch-over (COMPATIBILITY §4 step 6) once the repo is
+  published.
+
+**Migration must be a manual file swap.** Marketplace's uninstall deletes the
+entry under the old code, which wipes its statistics.
+
+`scripts/live_check.py` runs on the maintainer's Mac with only aiohttp and PyJWT:
 `uv run --no-project --with aiohttp --with pyjwt python scripts/live_check.py`.
 
 ## Non-negotiables
