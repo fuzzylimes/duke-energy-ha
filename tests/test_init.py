@@ -16,13 +16,19 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
-from custom_components.duke_energy.api import AuthExpiredError, TransientError
+from custom_components.duke_energy.api import (
+    AuthExpiredError,
+    TokenSet,
+    TransientError,
+)
 from custom_components.duke_energy.const import (
     CONF_EMAIL,
     CONF_ID_TOKEN_EXP,
     CONF_INTERNAL_IDENTIFIER,
     CONF_REFRESH_TOKEN,
     DOMAIN,
+    OPT_APP_USER_AGENT,
+    OPT_REMOTE_USER_AGENT,
     REMOTE_USER_AGENTS_URL,
     statistic_id,
 )
@@ -78,6 +84,44 @@ async def test_setup_and_unload(hass, no_polling, meters_ok):
     assert no_polling.await_count == 1  # first refresh ran in the background
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_token_refresh_does_not_reload(hass, no_polling, meters_ok):
+    """Saving refreshed tokens must not reload the entry.
+
+    Regression: an update listener reloaded on every entry update, including
+    token saves. A new entry whose data was already current then looped
+    forever: setup, keep-alive refresh, save, reload, and back to setup.
+    """
+    entry = v3_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    new = TokenSet(
+        refresh_token="r2", id_token=make_id_token(), id_token_exp=time.time() + 1800
+    )
+    with patch(f"{MODULE}.Auth0Client.async_refresh", AsyncMock(return_value=new)):
+        await coordinator.client.tokens.async_refresh()
+    await hass.async_block_till_done()
+    assert entry.data[CONF_REFRESH_TOKEN] == "r2"
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data is coordinator
+    assert meters_ok.await_count == 1
+
+
+async def test_options_change_reloads(hass, no_polling, meters_ok):
+    entry = v3_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {OPT_APP_USER_AGENT: "", OPT_REMOTE_USER_AGENT: False}
+    )
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert meters_ok.await_count == 2
 
 
 async def test_setup_without_tokens_needs_reauth(hass, no_polling):

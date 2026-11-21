@@ -110,16 +110,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -
 
     # The coordinator only polls while it has listeners; there are no entities.
     entry.async_on_unload(coordinator.async_add_listener(lambda: None))
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     # A backfill can take a minute or more, so don't hold up startup for it.
     entry.async_create_background_task(
         hass, coordinator.async_refresh(), "duke_energy first refresh"
     )
     return True
-
-
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -> bool:

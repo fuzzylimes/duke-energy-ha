@@ -12,7 +12,7 @@ from homeassistant.config_entries import (
     SOURCE_RECONFIGURE,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -201,8 +201,13 @@ class DukeEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class DukeEnergyOptionsFlow(OptionsFlow):
-    """User-Agent settings (docs/DESIGN.md §3.4)."""
+class DukeEnergyOptionsFlow(OptionsFlowWithReload):
+    """User-Agent settings (docs/DESIGN.md §3.4).
+
+    HA reloads the entry when this flow saves. Don't use an update listener
+    for that: it also fires when refreshed tokens are saved to the entry, which
+    reloads the entry after every token refresh.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
