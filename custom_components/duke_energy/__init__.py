@@ -110,7 +110,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -
 
     # The coordinator only polls while it has listeners; there are no entities.
     entry.async_on_unload(coordinator.async_add_listener(lambda: None))
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     # A backfill can take a minute or more, so don't hold up startup for it.
     entry.async_create_background_task(
         hass, coordinator.async_refresh(), "duke_energy first refresh"
@@ -118,13 +117,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
 async def async_unload_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -> bool:
-    """Unload. Statistics are never touched (docs/DESIGN.md §6)."""
-    await entry.runtime_data.client.transport.session.close()
+    """Unload. Statistics are never touched (docs/DESIGN.md §6).
+
+    HA detaches the session from `async_create_clientsession` on unload by
+    itself, and logs a warning if we close it ourselves.
+    """
     return True
 
 

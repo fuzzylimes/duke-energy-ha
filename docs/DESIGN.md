@@ -246,6 +246,12 @@ cheap to get again.
   returning** (`hass.config_entries.async_update_entry`). This guards against
   refresh-token rotation (SPEC §2.4, unknown): losing the newest token would
   force a re-auth.
+- **Saving tokens must not reload the entry.** Never register an entry
+  update listener: HA calls it on *every* `async_update_entry`, token saves
+  included. Options changes reload through `OptionsFlowWithReload` instead.
+  (Found 2026-11-21, maintainer's install: a re-added entry whose data was
+  already current looped forever. Setup ran the keep-alive refresh, the token
+  save reloaded the entry, and the new setup did it all again.)
 - **`async_get_api_token()`.** Use the cached Duke token unless it is missing
   or within 60 s of expiry. Expiry is computed as **local receive time +
   `expires_in`**, defaulting to 1800. `issued_at` is ignored because its units

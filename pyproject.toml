@@ -1,6 +1,6 @@
 [project]
 name = "duke-energy-ha"
-version = "0.1.0"
+version = "0.1.1"
 description = "Home Assistant custom integration that imports Duke Energy hourly usage into long-term statistics"
 readme = "README.md"
 license = "MIT"
