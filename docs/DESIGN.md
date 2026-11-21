@@ -229,7 +229,7 @@ The config entry, version 3, stores:
 ```python
 entry.data = {
     "refresh_token": str,
-    "id_token": str,          # cache only, so a restart within 30 min skips a refresh
+    "id_token": str,  # cache only, so a restart within 30 min skips a refresh
     "id_token_exp": float,
     "internal_identifier": str,
     "email": str,
@@ -380,15 +380,21 @@ validates strictly instead of guessing.
 
 1. **Build the expected sequence.** Step one UTC hour at a time from local
    midnight on `startDate` to local midnight after `endDate`. Each step's label
-   is `local.strftime("%I %p")`. This naturally gives 25 labels on fall-back
-   day (two `01 AM`, EDT then EST) and 23 on spring-forward day.
+   is `local.strftime("%I %p")`. On spring-forward day this gives 23 labels.
+   On fall-back day it gives 25, with two `01 AM` (EDT, then EST).
+   - **Duke's shape** (confirmed live, SPEC §10) leaves out the repeated
+     fall-back hour, so its fall-back day has 24 labels.
 2. **Fast path:** if Duke's labels equal the expected labels exactly, zip them
-   and use each UTC start directly. The fall-back duplicate maps to
-   01:00 EST. That fixes the old parser's lost hour.
+   and use each UTC start directly.
+   - **Shapes tried:** Duke's current shape first, then the older 25-row
+     shape.
+   - **Fall-back day:** the single `01 AM` is 01:00 EDT. 01:00 EST is a
+     missing hour, with no row written and the sum carried over it.
 3. **Mismatch on a multi-day window:** re-request that window **one day at a
-   time**. Within a single day, labels are unique apart from the DST pair. So
-   matching Duke's rows as an ordered subsequence of the expected labels is
-   unambiguous: skipped labels are missing hours. Any row that can't be placed
+   time**. Within a single day, labels are unique apart from the fall-back
+   `01 AM` pair. Matching Duke's rows as an ordered subsequence of the expected
+   labels is then unambiguous: skipped labels are missing hours, and a single
+   `01 AM` goes on the first (EDT) hour. Any row that can't be placed
    rejects that day. The day is logged and treated as missing.
 
    This closes the "whole missing day silently shifts everything" hole (SPEC
@@ -490,20 +496,23 @@ custom_components/duke_energy/
     client.py          account/list (+normalization), account-details-v2, usage graph
     parse.py           hourly row alignment (pure)
     errors.py          error classes + response classifier
+    http.py            Transport: timeouts, retries, classification in one place
     models.py          dataclasses: TokenSet, Account, Meter, HourlyReading
 tests/
-  fixtures/            sanitized live captures + synthetic edge cases (DST, gaps, HTML 403, …)
+  fixtures/            sanitized live captures (from live_check.py --capture)
+  helpers.py, fakes.py synthetic IDs, JWT builder, fake Duke client for HA-level tests
   api/                 test_oauth.py, test_tokens.py, test_client.py, test_parse.py, test_errors.py
   test_statistics_plan.py
   test_statistics_recorder.py
   test_config_flow.py
   test_coordinator.py
-  test_migration.py
+  test_init.py         setup, unload/removal keep statistics, v1/v2 → v3 migration
+  test_user_agent.py
 scripts/
-  live_check.py        maintainer-only: paste login in a terminal, fetch yesterday, print redacted summary
-  capture_fixture.py   maintainer-only: save a redacted response as a test fixture
+  live_check.py        maintainer-only: paste login in a terminal, fetch recent days, print a
+                       redacted summary; --capture DIR saves redacted responses as fixtures
 hacs.json
-pyproject.toml         uv-managed; dev deps only (HA test plugin, ruff, mypy, aioresponses)
+pyproject.toml         uv-managed; dev deps only (HA test plugin, ruff, mypy)
 uv.lock
 .github/workflows/ci.yml   ruff, mypy, pytest (min + latest HA), hassfest, HACS validation
 README.md
@@ -531,7 +540,8 @@ request sets the full header set from SPEC §4.1.
 - `uv` for the environment.
 - `pytest` with `pytest-homeassistant-custom-component`, pinned per CI matrix
   entry.
-- `aioresponses` for HTTP in `tests/api`.
+- HA's `AiohttpClientMocker` (from the test plugin) for HTTP in `tests/api`.
+  `aioresponses` doesn't work with the aiohttp version HA ships.
 - `ruff` for format and lint.
 - `mypy`: strict for `api/` and `statistics.py`, default for the HA glue.
 
@@ -571,8 +581,8 @@ request sets the full header set from SPEC §4.1.
    - keep-alive refresh.
 7. **Live check (manual, not CI).** `scripts/live_check.py` runs against your
    account when Duke changes something. Tokens go to `.secrets/` (gitignored).
-   New response shapes become fixtures via `capture_fixture.py`, which redacts
-   them first.
+   New response shapes become fixtures via `live_check.py --capture DIR`, which
+   redacts them first.
 
 **CI:**
 

@@ -123,9 +123,12 @@ row**.
 3. **Load stored rows** for the window plus one hour before it
    (`statistics_during_period(..., types={"sum", "state"})`).
 4. **Pick the anchor row:** the latest stored row with
-   `start < first fetched hour`. Its `sum` is the base. If no stored row is
-   that old (the overlap reaches back before the series start), the base is
-   `0.0`. That only happens for a brand-new series.
+   `start < first fetched hour`. Its `sum` is the base.
+   - **No stored row is that old** (the overlap reaches back before the series
+     start): don't write any hour before the series' first stored row. Use
+     that row's `sum − state` as the base, so every stored sum stays exactly
+     as it is.
+   - **No stored rows at all** (a brand-new series): the base is `0.0`.
 5. **Walk forward** through fetched hours in ascending order: `sum += kWh`,
    and emit `(start, state=kWh, sum)` for each hour.
    - **Suffix rule:** a rewrite always covers a contiguous range from just
@@ -188,8 +191,17 @@ installed**.
 
 1. **Back up HA**, at least `home-assistant_v2.db`.
 2. **Don't delete, reload or disable** the existing Duke Energy entry.
-3. **In HACS**, replace the old repository with this one at the same domain,
-   `duke_energy`. Then restart HA.
+3. **Replace the files by hand, not through Marketplace (HACS).** Delete
+   `custom_components/duke_energy/` and copy this integration's folder in its
+   place, then restart HA. HA keeps running the old code from memory until the
+   restart, and shutdown doesn't unload entries, so the old code's clearing
+   never runs.
+   - **Why not Marketplace** (found 2026-11-20, maintainer's install):
+     Marketplace refuses to uninstall an integration that still has a config
+     entry. Its pop-up says the entry "would fail to load and leave its devices
+     and entities behind". It offers only "Delete it first" or "let the
+     Marketplace delete it and uninstall Duke Energy for you". Both unload the
+     old entry under the old code, which clears the statistics.
 4. **On startup**, the new code runs `async_migrate_entry` on the old entry
    (version 2):
    - **Refresh token present:** it keeps the Auth0 refresh token from
@@ -199,6 +211,20 @@ installed**.
      DESIGN.md).
    - **No statistics are touched** by migration.
 5. **First poll:** backfill per §3.3.
+6. **Switching Marketplace over (optional, later).** Marketplace still lists
+   the old repository as installed, and updating or redownloading it there
+   reinstalls the old code. Once the new code is running, removing the entry is
+   harmless (see below). So the user can uninstall the old listing, letting
+   Marketplace delete the entry, then download this repository and add the
+   integration again. ⚠ Not yet verified live.
+
+**Verified live 2026-11-20** (steps 1–5, maintainer's install, hunterjm 0.3.1):
+
+- The entry migrated v2 → v3 and kept its sign-in. No re-auth was needed.
+- The first poll backfilled the 10 days since the old code's last row.
+- The Energy dashboard shows no jump at the boundary.
+- The migration log line is INFO, so it's hidden at HA's default log level.
+  Check the entry in Devices & services instead, or enable info logging.
 
 **After migration:** the new integration **never** clears statistics. That
 covers unload, reload, and removing the entry. Deleting and re-adding the
@@ -233,8 +259,10 @@ All of these run against a real recorder, via
    the same final sums as a run with no failure.
 4. **Coverage requirement.** Fetched data ends before `T_last`. Assert stored
    rows are untouched.
-5. **DST.** Fall-back (25 rows) and spring-forward (23 rows) fixtures. Assert
-   correct UTC starts and that no hour is dropped or duplicated.
+5. **DST.** Fall-back fixtures, both Duke's current 24-row shape (single
+   `01 AM`) and the older 25-row shape, plus spring-forward (23 rows). Assert
+   correct UTC starts, that no hour is duplicated, and that the sum stays
+   continuous across the missing repeated hour.
 6. **Migration.** A v2 entry with an old-format token migrates without touching
    statistics. Unload and remove do not clear statistics.
 7. **ID stability.** The ID built from fixture `serialNum` values equals the

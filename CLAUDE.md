@@ -23,9 +23,25 @@ them. Update the docs in the same change as the code.
 
 ## Status
 
-The design docs are approved. **Don't start implementation until the
-maintainer says so.** No code exists yet. The layout and commands below are
-the planned target.
+The design docs are approved, and v0.1.0 is implemented on branch
+`feat/initial-implementation`. It is tested against mocks and a real recorder,
+and the API client passed a first live check on 2026-11-19 (docs/SPEC.md §10).
+On 2026-11-20 it ran in the maintainer's HA install for the first time. It
+migrated the hunterjm 0.3.1 entry in place, kept the sign-in, and backfilled
+from Nov 9 with a continuous sum (COMPATIBILITY §4).
+
+**Next:**
+
+- confirm daily imports keep arriving (the 19th was still pending on the
+  morning of the 20th);
+- verify the Marketplace switch-over (COMPATIBILITY §4 step 6) once the repo is
+  published.
+
+**Migration must be a manual file swap.** Marketplace's uninstall deletes the
+entry under the old code, which wipes its statistics.
+
+`scripts/live_check.py` runs on the maintainer's Mac with only aiohttp and PyJWT:
+`uv run --no-project --with aiohttp --with pyjwt python scripts/live_check.py`.
 
 ## Non-negotiables
 
@@ -56,8 +72,10 @@ the planned target.
 - **Re-auth only for failures re-auth can fix.** WAF/edge blocks, revoked
   client credentials and API route changes become repair issues and retries,
   not reauth (DESIGN §5).
-- **Never log** tokens, the `Authorization` header, email, account numbers,
-  addresses or serials.
+- **Never log** tokens, the `Authorization` header, email, account numbers or
+  addresses. Meter serials and statistic IDs may be logged: HA already shows
+  them, and masking them makes logs harder to follow. The rule for serials is
+  the one above: never commit a real one.
 - **App User-Agent resolution, in priority order:**
   1. the user override in options;
   2. a remote `user-agents.json` in this repo, fetched weekly or right after a
@@ -66,17 +84,17 @@ the planned target.
 
   See DESIGN §3.4.
 
-## Planned layout (DESIGN §7)
+## Layout (DESIGN §7)
 
 ```
 custom_components/duke_energy/
   __init__.py  config_flow.py  coordinator.py  statistics.py  user_agent.py
   diagnostics.py  repairs.py  const.py  manifest.json  strings.json  translations/
   api/         # no Home Assistant imports
-    const.py  oauth.py  tokens.py  client.py  parse.py  errors.py  models.py
-tests/         # api/, statistics planner, recorder-backed, config flow, coordinator, migration
-scripts/       # live_check.py, capture_fixture.py (maintainer-only, never in CI)
-hacs.json  pyproject.toml  uv.lock  user-agents.json  .github/workflows/ci.yml
+    const.py  http.py  oauth.py  tokens.py  client.py  parse.py  errors.py  models.py
+tests/         # api/ (no hass), statistics planner, recorder-backed, config flow, coordinator, init
+scripts/       # live_check.py (maintainer-only, never in CI)
+hacs.json  pyproject.toml  uv.lock  user-agents.json  README.md  LICENSE  .github/workflows/ci.yml
 ```
 
 **Notes:**
@@ -85,16 +103,34 @@ hacs.json  pyproject.toml  uv.lock  user-agents.json  .github/workflows/ci.yml
   `aiohttp`, `yarl`, `PyJWT`.
 - **The API client lives in-tree** under `api/`. It is not a PyPI package.
 
-## Dev commands (once scaffolded)
+## Dev commands
 
 ```bash
-uv sync                                  # create env with dev deps
-uv run pytest                            # all tests
-uv run pytest tests/api                  # API client tests only (no HA)
+uv sync --python 3.14                    # latest supported HA (pinned test plugin)
+uv run pytest                            # all tests (~1 min; recorder-backed tests are the slow part)
+uv run pytest tests/api                  # API client tests only (no hass)
 uv run ruff format . && uv run ruff check .
 uv run mypy custom_components            # strict for api/ and statistics.py
-uv run python scripts/live_check.py      # manual check against the live API; tokens in .secrets/ (gitignored)
+
+# Minimum supported HA (2025.12) lives in a second env on Python 3.13:
+UV_PROJECT_ENVIRONMENT=.venv-min uv sync --python 3.13
+UV_PROJECT_ENVIRONMENT=.venv-min uv run --python 3.13 pytest
+
+uv run python scripts/live_check.py --days 2          # live API check; tokens in .secrets/ (gitignored)
+uv run python scripts/live_check.py --capture DIR     # also save redacted responses for fixtures
 ```
+
+**Test gotchas:**
+
+- **Recorder before `hass`.** The recorder must start before `hass`, so
+  `tests/conftest.py`'s autouse fixture requests `recorder_mock` first.
+  `tests/api/conftest.py` overrides that fixture so API tests skip hass
+  entirely.
+- **Two schema libraries.** HA 2026.10+ validates flow schemas with
+  `probatio`; older HA uses `voluptuous`. `config_flow.py` takes whichever one
+  `homeassistant.data_entry_flow` imports.
+- **Building the min env on arm64** needs a C compiler (`build-essential`) for
+  `lru-dict`.
 
 CI runs ruff, mypy, pytest on the HA version matrix, hassfest, and HACS
 validation.

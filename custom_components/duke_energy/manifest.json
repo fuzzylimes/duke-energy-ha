@@ -1,0 +1,14 @@
+{
+  "domain": "duke_energy",
+  "name": "Duke Energy",
+  "codeowners": ["@fuzzylimes"],
+  "config_flow": true,
+  "dependencies": ["recorder"],
+  "documentation": "https://github.com/fuzzylimes/duke-energy-ha",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/fuzzylimes/duke-energy-ha/issues",
+  "loggers": ["custom_components.duke_energy"],
+  "requirements": [],
+  "version": "0.1.0"
+}

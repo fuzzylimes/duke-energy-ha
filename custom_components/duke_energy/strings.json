@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "login": {
+        "title": "Sign in to Duke Energy",
+        "description": "1. **On a computer:** Duke's sign-in only works in a browser that looks like an iPhone. Open your browser's developer tools and turn on device emulation with an iPhone selected (Chrome/Edge: F12, then Ctrl+Shift+M; Firefox: Ctrl+Shift+M; Safari: Develop → User Agent → Safari iOS). Keep it on while you sign in. **On a phone:** skip this step.\n2. [Open the Duke Energy sign-in page]({authorize_url}) and sign in.\n3. You'll land on a page that says **Not Found**. That's expected. Copy that page's full address (it starts with `{callback_prefix}`) and paste it below.\n\nThe link only works once and expires after a few minutes. If you take longer, reopen this dialog for a fresh one.\n\nIf you'd rather set the User-Agent by hand, use: `{browser_user_agent}`",
+        "data": {
+          "callback_url": "Address of the \"Not Found\" page"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Duke Energy again",
+        "description": "Duke Energy no longer accepts the saved sign-in. Your usage history is safe. Sign in again to continue importing."
+      }
+    },
+    "error": {
+      "invalid_callback_url": "That isn't the address of the \"Not Found\" page. Copy the full address that starts with {callback_prefix}.",
+      "authorize_rejected": "Duke Energy rejected the sign-in. This almost always means the browser wasn't emulating an iPhone. Turn on device emulation (step 1) and use the new link.",
+      "public_site_redirect": "Duke Energy sent you to its main website instead of the \"Not Found\" page. That means the sign-in was rejected, usually because the browser wasn't emulating an iPhone. Turn on device emulation (step 1) and use the new link.",
+      "state_mismatch": "That address came from a different sign-in attempt. Use the link shown in this dialog.",
+      "code_expired": "The sign-in code expired or was already used. Use the new link and paste the address right after signing in.",
+      "invalid_auth": "Duke Energy returned an invalid sign-in. Try again with the new link.",
+      "blocked": "Duke Energy's network is blocking requests from this integration. Check for an integration update, or set an app User-Agent in the integration's options.",
+      "client_rejected": "Duke Energy no longer accepts this integration's app credentials. An integration update is needed.",
+      "api_changed": "Duke Energy changed its service in a way this version doesn't understand. Check for an integration update.",
+      "cannot_connect": "Couldn't reach Duke Energy. Try again in a few minutes.",
+      "unknown": "Unexpected error. Check the logs for details."
+    },
+    "abort": {
+      "already_configured": "This Duke Energy account is already set up.",
+      "wrong_account": "You signed in with a different Duke Energy account than the one this entry belongs to.",
+      "reauth_successful": "Signed in again. Importing will resume shortly.",
+      "reconfigure_successful": "Signed in again. Importing will resume shortly."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "App User-Agent",
+        "description": "Duke Energy only answers requests that identify as a recent version of its iPhone app. By default the integration checks this project's GitHub repository once a week for the current known-good value, and right away if Duke starts blocking requests.\n\nOnly set an override if you have a newer value than the integration is using. Built-in default: `{default_user_agent}`",
+        "data": {
+          "app_user_agent": "App User-Agent override",
+          "remote_user_agent": "Check GitHub weekly for the known-good value"
+        },
+        "data_description": {
+          "app_user_agent": "Leave empty to use the shared or built-in value. When set, it is always used and GitHub isn't checked.",
+          "remote_user_agent": "Turn off to never contact GitHub. The override or the built-in default is used instead."
+        }
+      }
+    },
+    "error": {
+      "invalid_user_agent": "Use printable characters only, up to 300."
+    }
+  },
+  "issues": {
+    "blocked": {
+      "title": "Duke Energy is blocking requests",
+      "description": "For over 12 hours, Duke Energy's network has refused this integration's requests. Signing in again won't help. Usually Duke raised the minimum app version it accepts.\n\nThe integration checks for a new known-good value automatically (unless you turned that off). Otherwise, update the integration or set a newer app User-Agent in its options. Your usage history is safe and will be backfilled once requests work again."
+    },
+    "client_rejected": {
+      "title": "Duke Energy rejected the integration's app credentials",
+      "description": "Duke Energy has denied the app credentials this integration uses. Signing in again won't help. An integration update is needed. Your usage history is safe and will be backfilled afterwards."
+    },
+    "api_changed": {
+      "title": "Duke Energy changed its service",
+      "description": "Duke Energy's `{endpoint}` endpoint no longer works the way this version expects. Check for an integration update. Your usage history is safe and will be backfilled afterwards."
+    },
+    "metadata_mismatch": {
+      "title": "Existing Duke Energy statistic doesn't match",
+      "description": "The statistic `{statistic_id}` already exists, but its settings differ ({fields}). Imports for it are paused so its history isn't overwritten with different units or meaning. Check Developer Tools → Statistics."
+    },
+    "new_meter": {
+      "title": "New Duke Energy meter found",
+      "description": "Duke Energy reports a meter without any history yet, `{statistic_id}`, next to existing Duke Energy statistics. This usually means the meter was replaced. Its usage is imported as a new statistic. Add it to the Energy dashboard (Settings → Dashboards → Energy) to keep tracking consumption. The old statistic keeps its history."
+    }
+  }
+}
