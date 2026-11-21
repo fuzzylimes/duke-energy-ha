@@ -11,6 +11,7 @@ from homeassistant.components.recorder.statistics import (
     list_statistic_ids,
 )
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.helpers.aiohttp_client import WARN_CLOSE_MSG
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
@@ -75,7 +76,7 @@ def meters_ok():
         yield get
 
 
-async def test_setup_and_unload(hass, no_polling, meters_ok):
+async def test_setup_and_unload(hass, no_polling, meters_ok, caplog):
     entry = v3_entry()
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -84,6 +85,8 @@ async def test_setup_and_unload(hass, no_polling, meters_ok):
     assert no_polling.await_count == 1  # first refresh ran in the background
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is ConfigEntryState.NOT_LOADED
+    # HA detaches the session on unload; closing it ourselves logs a warning.
+    assert WARN_CLOSE_MSG not in caplog.text
 
 
 async def test_token_refresh_does_not_reload(hass, no_polling, meters_ok):

@@ -118,8 +118,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DukeEnergyConfigEntry) -> bool:
-    """Unload. Statistics are never touched (docs/DESIGN.md §6)."""
-    await entry.runtime_data.client.transport.session.close()
+    """Unload. Statistics are never touched (docs/DESIGN.md §6).
+
+    HA detaches the session from `async_create_clientsession` on unload by
+    itself, and logs a warning if we close it ourselves.
+    """
     return True
 
 
